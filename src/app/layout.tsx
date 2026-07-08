@@ -1,6 +1,5 @@
 import React from 'react';
-// Vercel 빌드 에러 방지를 위해 css 임포트 주석 처리
-// import './globals.css'; 
+// import './globals.css';  <-- 이 줄을 지우거나 이렇게 맨 앞에 //를 붙여서 주석 처리합니다!
 
 export const metadata = {
   title: 'Miru Systems ALS',
@@ -10,9 +9,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body style={{ backgroundColor: '#f9fafb', margin: 0, padding: 0 }}>
-        {children}
-      </body>
+      <body className="bg-gray-50">{children}</body>
     </html>
   );
 }

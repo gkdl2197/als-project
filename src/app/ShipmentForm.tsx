@@ -8,31 +8,33 @@ export default function ShipmentForm() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [invoiceNo, setInvoiceNo] = useState<string>('자동 생성 예정');
   
-  // 8대 필수값 및 선적 정보 상태 관리
-  const [shipmentType, setShipmentType] = useState<string>('AIR');
-  const [isFree, setIsFree] = useState<string>('유상');
+  // 8대 필수값 및 날짜 4종 상태 관리
   const [ioType, setIoType] = useState<string>('EX');
+  const [isFree, setIsFree] = useState<string>('유상');
+  const [shipmentType, setShipmentType] = useState<string>('AIR');
   const [shipmentNo, setShipmentNo] = useState<string>('');
-  const [releaseDate, setReleaseDate] = useState<string>('');
-  const [etd, setEtd] = useState<string>('');
   const [actualQty, setActualQty] = useState<string>('');
   const [packingUnit, setPackingUnit] = useState<string>('PLT');
   const [packingQty, setPackingQty] = useState<string>('');
 
-  // 1. Supabase에서 등록된 마스터 프로젝트 목록 가져오기
-  const fetchProjects = async () => {
-    const { data } = await supabase.from('als_election_projects').select('*');
-    if (data) setProjects(data);
-  };
+  // 날짜 4종 수기 입력 필드
+  const [etd, setEtd] = useState<string>('');
+  const [atd, setAtd] = useState<string>('');
+  const [eta, setEta] = useState<string>('');
+  const [ata, setAta] = useState<string>('');
 
   useEffect(() => {
+    const fetchProjects = async () => {
+      const { data } = await supabase.from('als_election_projects').select('*');
+      if (data) setProjects(data);
+    };
     fetchProjects();
   }, []);
 
-  // 2. 프로젝트 선택 및 날짜 변경 시 인보이스 넘버 실시간 자동 채번 (MS-YYMM-국가코드-순번)
+  // 인보이스 넘버 실시간 자동 채번 엔진 (기준: ETD 연월 활용)
   useEffect(() => {
-    if (!selectedProjectId || !releaseDate) {
-      setInvoiceNo('출고일과 프로젝트를 선택하면 자동 생성됩니다.');
+    if (!selectedProjectId || !etd) {
+      setInvoiceNo('출발예정일(ETD)과 프로젝트를 선택하면 자동 생성됩니다.');
       return;
     }
 
@@ -41,13 +43,11 @@ export default function ShipmentForm() {
       if (!selectedProject) return;
 
       const countryCode = selectedProject.country_code.toUpperCase();
-      // 출고일 기준 연월 추출 (예: 2026-07-15 -> 2607)
-      const dateObj = new Date(releaseDate);
+      const dateObj = new Date(etd);
       const yy = dateObj.getFullYear().toString().slice(-2);
       const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
       const prefix = `MS-${yy}${mm}-${countryCode}`;
 
-      // DB에서 동일한 프리픽스를 가진 기존 인보이스 개수 조회하여 순번 확정
       const { count } = await supabase
         .from('als_shipments')
         .select('*', { count: 'exact', head: true })
@@ -58,14 +58,13 @@ export default function ShipmentForm() {
     };
 
     generateInvoiceNo();
-  }, [selectedProjectId, releaseDate, projects]);
+  }, [selectedProjectId, etd, projects]);
 
-  // 3. [선적 확정] 버튼 클릭 시 Supabase DB에 최종 적재
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedProjectId || !releaseDate || !etd || !actualQty) {
-      alert('⚠️ 모든 필수 항목을 입력해 주세요.');
+    if (!selectedProjectId || !etd || !actualQty) {
+      alert('⚠️ 프로젝트, 출발예정일, 수량은 필수 입력 항목입니다.');
       return;
     }
 
@@ -73,34 +72,33 @@ export default function ShipmentForm() {
       {
         invoice_no: invoiceNo,
         project_id: parseInt(selectedProjectId),
+        io_type: ioType,
+        is_free: isFree,
         actual_qty: parseInt(actualQty),
         packing_unit: `${packingQty} ${packingUnit}`,
         shipment_type: shipmentType,
         shipment_no: shipmentNo || null,
-        release_date: releaseDate,
-        etd: etd,
+        etd: etd || null,
+        atd: atd || null,
+        eta: eta || null,
+        ata: ata || null,
       }
     ]);
 
     if (error) {
       alert(`❌ 선적 저장 실패: ${error.message}`);
     } else {
-      alert(`🎉 인보이스 [${invoiceNo}] 발행 및 선적 데이터 적재 성공!`);
-      // 입력 폼 초기화 및 새로고침
-      setShipmentNo('');
-      setActualQty('');
-      setPackingQty('');
-      window.location.reload(); // 하단 리스트 실시간 동기화를 위해 화면 새로고침
+      alert(`🎉 인보이스 [${invoiceNo}] 발행 및 ALS 모니터링 적재 성공!`);
+      window.location.reload();
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md border border-gray-200">
       <h2 className="text-xl font-bold text-gray-800 mb-2">🚢 ALS 실 선적 정보 입력 & 인보이스 발행</h2>
-      <p className="text-xs text-gray-500 mb-6">당해 연도 입찰 계약 데이터를 기반으로 일렌번호 및 인보이스를 자동 추출합니다.</p>
+      <p className="text-xs text-gray-500 mb-6">수출입 구분 및 변동성이 큰 날짜 4종을 수기 관리하여 현지 담당자에게 실시간 공유합니다.</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* 채번 결과 노출 영역 */}
         <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
           <span className="text-xs font-semibold text-blue-700 block mb-1">발행 예정 인보이스 넘버</span>
           <span className="text-xl font-black text-blue-900 tracking-wide">{invoiceNo}</span>
@@ -109,11 +107,7 @@ export default function ShipmentForm() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">연동할 선거 계약 프로젝트 선택 *</label>
-            <select 
-              value={selectedProjectId} 
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="w-full p-2 border rounded text-sm bg-gray-50"
-            >
+            <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} className="w-full p-2 border rounded text-sm bg-gray-50">
               <option value="">-- 프로젝트 계약 선택 --</option>
               {projects.map(p => (
                 <option key={p.id} value={p.id}>[{p.contract_year}] {p.consignee} ({p.country_code})</option>
@@ -151,17 +145,7 @@ export default function ShipmentForm() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">⚠️ 출고일 (수기 입력) *</label>
-            <input type="date" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} className="w-full p-2 border rounded text-sm"/>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">5) 출발예정일 (ETD) *</label>
-            <input type="date" value={etd} onChange={(e) => setEtd(e.target.value)} className="w-full p-2 border rounded text-sm"/>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">4) 수량 (UN / SET) *</label>
+            <label className="block text-xs font-bold text-gray-700 mb-1">4) 품목별 출고 수량 (UN / SET) *</label>
             <input type="number" placeholder="출고 수량 입력" value={actualQty} onChange={(e) => setActualQty(e.target.value)} className="w-full p-2 border rounded text-sm"/>
           </div>
 
@@ -181,7 +165,30 @@ export default function ShipmentForm() {
           </div>
         </div>
 
-        <button type="submit" className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded shadow transition text-sm">
+        {/* 파트너님 오더 사항: 변동성 대응 날짜 4종 수기 섹션 */}
+        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 mt-4">
+          <span className="text-xs font-bold text-gray-800 block mb-3">📅 선적 및 스케줄 일정 관리 (수기 입력)</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block style style-none text-[11px] font-medium text-gray-500 mb-0.5">5) 출발예정일 (ETD) *</label>
+              <input type="date" value={etd} onChange={(e) => setEtd(e.target.value)} className="w-full p-1.5 border rounded text-xs"/>
+            </div>
+            <div>
+              <label className="block style style-none text-[11px] font-medium text-gray-500 mb-0.5">실제 출발일 (ATD)</label>
+              <input type="date" value={atd} onChange={(e) => setAtd(e.target.value)} className="w-full p-1.5 border rounded text-xs"/>
+            </div>
+            <div>
+              <label className="block style style-none text-[11px] font-medium text-gray-500 mb-0.5">도착 예정일 (ETA)</label>
+              <input type="date" value={eta} onChange={(e) => setEta(e.target.value)} className="w-full p-1.5 border rounded text-xs"/>
+            </div>
+            <div>
+              <label className="block style style-none text-[11px] font-medium text-gray-500 mb-0.5">실제 도착일 (ATA)</label>
+              <input type="date" value={ata} onChange={(e) => setAta(e.target.value)} className="w-full p-1.5 border rounded text-xs"/>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded shadow transition text-sm">
           ✅ 선적 확정 및 인보이스 발행
         </button>
       </form>

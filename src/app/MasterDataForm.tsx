@@ -1,82 +1,88 @@
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabaseClient'; // 상위로 두 번 나가서 lib을 찾습니다.
+import { supabase } from '../lib/supabaseClient';
 
 export default function MasterDataForm() {
-  const [year, setYear] = useState<number>(2026); // 현재 시점 기준 기본값 설정
-  const [consignee, setConsignee] = useState<string>('');
+  const [contractYear, setContractYear] = useState<number>(2026);
   const [countryCode, setCountryCode] = useState<string>('');
+  const [consignee, setConsignee] = useState<string>('');
   const [itemName, setItemName] = useState<string>('');
-  const [qty, setQty] = useState<string>('');
-  const [price, setPrice] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
+  const [contractQty, setContractQty] = useState<number>(0);
+  const [unitPrice, setUnitPrice] = useState<number>(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
 
-    const { error } = await supabase
-      .from('als_election_projects')
-      .insert([
-        {
-          contract_year: year,
-          consignee: consignee.trim(),
-          country_code: countryCode.toUpperCase().trim(),
-          item_name: itemName.trim(),
-          contract_qty: parseInt(qty),
-          unit_price: parseFloat(price),
-        },
-      ]);
+    if (!countryCode || !consignee || !itemName) {
+      alert('⚠️ 필수 텍스트 항목을 입력해 주세요.');
+      return;
+    }
 
-    setLoading(false);
+    const { error } = await supabase.from('als_election_projects').insert([
+      {
+        contract_year: contractYear,
+        country_code: countryCode.toUpperCase(),
+        consignee: consignee,
+        item_name: itemName,
+        contract_qty: contractQty,
+        unit_price: unitPrice,
+      },
+    ]);
 
     if (error) {
-      alert('계약 마스터 등록 실패: ' + error.message);
+      alert(`❌ 마스터 등록 실패: ${error.message}`);
     } else {
-      alert('🎉 당해 연도 선거 계약 정보가 성공적으로 Supabase에 등록되었습니다!');
-      setConsignee(''); setCountryCode(''); setItemName(''); setQty(''); setPrice('');
+      alert('🎉 당해 연도 선거 계약 정보가 성공적으로 등록되었습니다!');
+      setCountryCode('');
+      setConsignee('');
+      setItemName('');
+      setContractQty(0);
+      setUnitPrice(0);
+      window.location.reload();
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md border border-gray-200">
-      <div className="border-b pb-4 mb-6">
-        <h2 className="text-xl font-bold text-gray-800">📋 ALS 연도별 선거 계약 마스터 등록</h2>
-        <p className="text-sm text-gray-500 mt-1">매해 입찰 계약 확정 시 나오는 정보를 초기 1회 등록합니다.[cite: 1, 2, 3]</p>
+    <div>
+      <div className="flex items-center gap-2 mb-4 border-b border-slate-800 pb-3">
+        <span className="text-xl">📋</span>
+        <h3 className="text-lg font-bold text-white">ALS 연도별 선거 계약 마스터 등록</h3>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700">계약 연도</label>
-            <input type="number" value={year} onChange={(e) => setYear(parseInt(e.target.value))} className="mt-1 block w-full rounded-md border p-2 border-gray-300" required />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700">도착국가 코드 (2자리)</label>
-            <input type="text" maxLength={2} placeholder="예: IQ, PH, KG" value={countryCode} onChange={(e) => setCountryCode(e.target.value)} className="mt-1 block w-full rounded-md border p-2 border-gray-300 uppercase" required />[cite: 1, 2, 3]
-          </div>
+      <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+        매해 입찰 계약 확정 시 나오는 고유 정보를 초기 1회 등록합니다. 등록된 정보는 실시간 인보이스 채번 및 단가 매핑의 기준점이 됩니다.
+      </p>
+
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 mb-1.5">계약 연도</label>
+          <input type="number" value={contractYear} onChange={(e) => setContractYear(parseInt(e.target.value))} className="w-full bg-slate-900 border border-slate-750 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition"/>
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700">Consignee (수하인 기관명)</label>
-          <input type="text" placeholder="예: THE INDEPENDENT HIGH ELECTORAL COMMISSION" value={consignee} onChange={(e) => setConsignee(e.target.value)} className="mt-1 block w-full rounded-md border p-2 border-gray-300" required />[cite: 1]
+          <label className="block text-xs font-semibold text-slate-400 mb-1.5">도착국가 코드 (2자리) *</label>
+          <input type="text" placeholder="예: IQ, PH, KG" value={countryCode} onChange={(e) => setCountryCode(e.target.value)} maxLength={2} className="w-full bg-slate-900 border border-slate-750 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 placeholder-slate-600 transition uppercase"/>
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700">ITEM (해당 계약 확정 품명)</label>
-          <input type="text" placeholder="예: PCOS motherboard" value={itemName} onChange={(e) => setItemName(e.target.value)} className="mt-1 block w-full rounded-md border p-2 border-gray-300" required />[cite: 1, 2]
+          <label className="block text-xs font-semibold text-slate-400 mb-1.5">Consignee (수하인 기관명) *</label>
+          <input type="text" placeholder="예: IHEC, COMELEC" value={consignee} onChange={(e) => setConsignee(e.target.value)} className="w-full bg-slate-900 border border-slate-750 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 placeholder-slate-600 transition"/>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700">계약 총 수량 (QTY)</label>
-            <input type="number" placeholder="0" value={qty} onChange={(e) => setQty(e.target.value)} className="mt-1 block w-full rounded-md border p-2 border-gray-300" required />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700">계약 단가 (Unit Price USD)</label>
-            <input type="number" step="0.01" placeholder="0.00" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1 block w-full rounded-md border p-2 border-gray-300" required />[cite: 1, 2, 3]
-          </div>
+        <div className="md:col-span-3">
+          <label className="block text-xs font-semibold text-slate-400 mb-1.5">ITEM (해당 계약 확정 품명) *</label>
+          <input type="text" placeholder="예: PCOS motherboard, IDP Устройство" value={itemName} onChange={(e) => setItemName(e.target.value)} className="w-full bg-slate-900 border border-slate-750 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 placeholder-slate-600 transition"/>
         </div>
-        <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-blue-700 transition disabled:bg-gray-400">
-          {loading ? 'Supabase DB 저장 중...' : '계약 마스터 데이터 저장'}
-        </button>
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 mb-1.5">계약 총 수량 (QTY)</label>
+          <input type="number" value={contractQty} onChange={(e) => setContractQty(parseInt(e.target.value))} className="w-full bg-slate-900 border border-slate-750 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition"/>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 mb-1.5">계약 단가 (Unit Price USD)</label>
+          <input type="number" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-750 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition"/>
+        </div>
+        <div className="flex items-end">
+          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm py-2.5 px-4 rounded-lg shadow-lg shadow-blue-600/10 transition-all duration-200 active:scale-[0.99]">
+            💾 계약 마스터 데이터 저장
+          </button>
+        </div>
       </form>
     </div>
   );
